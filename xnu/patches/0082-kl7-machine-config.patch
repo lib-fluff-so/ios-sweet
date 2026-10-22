@@ -1,0 +1,121 @@
+diff --git a/makedefs/MakeInc.def b/makedefs/MakeInc.def
+--- a/makedefs/MakeInc.def
++++ b/makedefs/MakeInc.def
+@@ -29,1 +29,1 @@
+-SUPPORTED_ARM64_MACHINE_CONFIGS = BCM2837 T6000 T8101 T8103 VMAPPLE SWEET
++SUPPORTED_ARM64_MACHINE_CONFIGS = BCM2837 T6000 T8101 T8103 VMAPPLE SWEET KL7
+@@ -61,1 +61,2 @@
+ MACHINE_FLAGS_ARM64_SWEET = -DARM64_BOARD_CONFIG_SWEET                -march=armv8.2-a+crypto
++MACHINE_FLAGS_ARM64_KL7 = -DARM64_BOARD_CONFIG_KL7 -DARM64_BOARD_CONFIG_SWEET -DSWEET -march=armv8.2-a+crypto
+@@ -260,3 +261,3 @@
+-ifneq ($(CURRENT_MACHINE_CONFIG),SWEET)
++ifeq ($(filter SWEET KL7,$(CURRENT_MACHINE_CONFIG)),)
+ export ARCH_STRING_FOR_CURRENT_MACHINE_CONFIG := arm64e
+ endif
+
+diff --git a/pexpert/pexpert/arm64/board_config.h b/pexpert/pexpert/arm64/board_config.h
+--- a/pexpert/pexpert/arm64/board_config.h
++++ b/pexpert/pexpert/arm64/board_config.h
+@@ -101,3 +101,11 @@
+ #endif  /* ARM64_BOARD_CONFIG_SWEET && !ARM64_BOARD_CONFIG_KL7 */
+ 
++#ifdef ARM64_BOARD_CONFIG_KL7
++#include <pexpert/arm64/KL7.h>
++#define MAX_L2_CLINE                   6
++#define MAX_CPUS                       8
++#define MAX_CPU_CLUSTERS               1
++#define CORE_NCTRS                     8
++#endif  /* ARM64_BOARD_CONFIG_KL7 */
++
+ #ifdef ARM64_BOARD_CONFIG_VMAPPLE
+
+diff --git a/pexpert/pexpert/arm64/Makefile b/pexpert/pexpert/arm64/Makefile
+--- a/pexpert/pexpert/arm64/Makefile
++++ b/pexpert/pexpert/arm64/Makefile
+@@ -17,4 +17,5 @@
+  H13.h \
+  VMAPPLE.h \
+  BCM2837.h \
+- SWEET.h
++ SWEET.h \
++ KL7.h
+
+diff --git a/pexpert/pexpert/arm64/KL7.h b/pexpert/pexpert/arm64/KL7.h
+new file mode 100644
+--- /dev/null
++++ b/pexpert/pexpert/arm64/KL7.h
+@@ -0,0 +1,56 @@
++/*
++ * Board configuration for Tecno Spark 30 Pro (KL7), MediaTek MT6789.
++ *
++ * The existing SWEET patches provide shared iOS-on-MacOS compatibility code.
++ * Build flags enable their legacy SWEET guards for KL7, while board_config.h
++ * deliberately skips SWEET.h when ARM64_BOARD_CONFIG_KL7 is selected. That
++ * prevents Qualcomm board constants from leaking into this configuration.
++ * Device-specific values below are KL7 values.
++ */
++#ifndef _PEXPERT_ARM64_KL7_H
++#define _PEXPERT_ARM64_KL7_H
++
++#define KL7                       1
++#define NO_MONITOR                1
++#define NO_ECORE                  1
++
++#define ARM_ARCH_TIMER
++#define __ARM_ARCH__              8
++#define __ARM_VMSA__              8
++#define __ARM_VFP__               4
++#define __ARM_COHERENT_CACHE__    1
++#define __ARM_DEBUG__             7
++#define __ARM_ENABLE_SWAP__       1
++#define __ARM_V8_CRYPTO_EXTENSIONS__ 1
++#define __ARM_PAN_AVAILABLE__     1
++#define __ARM_16K_PG__            1
++
++#define HAS_GIC_V3                1
++
++#ifndef ASSEMBLER
++#define PLATFORM_PANIC_LOG_DISABLED
++#endif
++
++/* KL7 FDT timer tuple: virtual timer PPI 11 => GIC INTID 16 + 11 = 27. */
++#define SWEET_VTIMER_INTID        27
++#define SWEET_IPI_SGI             1
++#define GIC_SPURIOUS_IRQ          1023
++#define GICR_PE_SIZE              0x20000
++
++/* GICv3 register definitions; secure Group 0 setup is platform/firmware-owned. */
++#define GICD_CTLR                 0x0
++#define GICD_CTLR_ENABLEGRP1      0x1
++#define GICD_CTLR_ENABLEGRP1A     0x2
++#define GICD_CTLR_ARE_NS          0x10
++#define GICD_CTLR_RWP             0x80000000
++#define GICR_TYPER                0x08
++#define GICR_WAKER                0x14
++#define GICR_IGROUPR0              0x10080
++#define GICR_ISENABLER0            0x10100
++#define GICR_IPRIORITYR0           0x10400
++#define GICR_TYPER_AFFINITY_VALUE_SHIFT 32
++#define GICR_TYPER_LAST            0x10
++#define GICR_WAKER_PROCESSORSLEEP  0x2
++#define GICR_WAKER_CHILDRENASLEEP  0x4
++#define ICC_CTLR_EOIMODE           0x2
++#define ICC_SRE_SRE                0x1
++
++#endif /* _PEXPERT_ARM64_KL7_H */
+
+diff --git a/iokit/KernelConfigTables.cpp b/iokit/KernelConfigTables.cpp
+--- a/iokit/KernelConfigTables.cpp
++++ b/iokit/KernelConfigTables.cpp
+@@ -68,3 +68,11 @@
+     "     'IONameMatch'     = 'sweet,display';"
+     "   },"
++#if defined(ARM64_BOARD_CONFIG_KL7)
++    "   {"
++    "     'IOClass'         = AppleCLCD;"
++    "     'IOProviderClass' = IOPlatformDevice;"
++    "     'IONameMatch'     = 'tecno,kl7-framebuffer';"
++    "     'IOProbeScore'    = 10000:32;"
++    "   },"
++#endif
+ #endif
